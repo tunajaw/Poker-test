@@ -168,6 +168,7 @@ io.sockets.on('connection', function( socket ) {
 				callback( { 'success': false, 'message': 'Please enter a screen name' } );
 			}
 		} else {
+			// dead code
 			callback( { 'success': false, 'message': '' } );
 		}
 	});
@@ -269,9 +270,21 @@ io.sockets.on('connection', function( socket ) {
 	 * @param function callback
 	 */
 	socket.on('check', function( callback ){
+		var tableId = players[0].sittingOnTable;
+		var activeSeat = tables[tableId].public.activeSeat;
+		console.log(players.length + ' / ' + socket.id)
+		console.log(players[0].sittingOnTable);
+		console.log('Table id:' + tableId);
+		console.log(tables[0].seats[activeSeat] +  ' / ' + socket.id);
+		console.log('Biggest bet:' + tables[0].public.biggestBet);
+		console.log('Phase:' + tables[0].public.phase);
+		console.log('Player bet:' + players[0].public.bet);
 		if( players[socket.id].sittingOnTable !== 'undefined' ) {
 			var tableId = players[socket.id].sittingOnTable;
 			var activeSeat = tables[tableId].public.activeSeat;
+
+			
+
 
 			if( tables[tableId] 
 				&& tables[tableId].seats[activeSeat].socket.id === socket.id 
@@ -412,3 +425,5 @@ tables[0] = new Table( 0, 'Sample 10-handed Table', eventEmitter(0), 10, 2, 1, 2
 tables[1] = new Table( 1, 'Sample 6-handed Table', eventEmitter(1), 6, 4, 2, 400, 80, false );
 tables[2] = new Table( 2, 'Sample 2-handed Table', eventEmitter(2), 2, 8, 4, 800, 160, false );
 tables[3] = new Table( 3, 'Sample 6-handed Private Table', eventEmitter(3), 6, 20, 10, 2000, 400, true );
+
+module.exports = { app, server, io, players, tables };
