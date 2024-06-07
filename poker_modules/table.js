@@ -205,6 +205,10 @@ Table.prototype.findPreviousPlayer = function( offset, status ) {
 Table.prototype.initializeRound = function( changeDealer ) {
 	changeDealer = typeof changeDealer == 'undefined' ? true : changeDealer ;
 
+	console.log("changeDealer: "+changeDealer);
+	console.log("Players:" + this.playersSittingInCount);
+
+
 	if( this.playersSittingInCount > 1 ) {
 		// The game is on now
 		this.gameIsOn = true;
@@ -263,6 +267,8 @@ Table.prototype.initializeSmallBlind = function() {
 	} else {
 		this.public.activeSeat = this.findNextPlayer( this.public.dealerSeat );
 	}
+
+	console.log("activeSeat: " + this.public.activeSeat);
 	this.lastPlayerToAct = 10;
 
 	// Start asking players to post the small blind

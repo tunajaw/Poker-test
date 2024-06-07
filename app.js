@@ -86,6 +86,8 @@ io.sockets.on('connection', function( socket ) {
 			socket.join( 'table-' + tableId );
 			// Add the room to the player's data
 			players[socket.id].room = tableId;
+
+			console.log("Player " + socket.id + " joined room " + tableId);
 		}
 	});
 
@@ -93,6 +95,9 @@ io.sockets.on('connection', function( socket ) {
 	 * When a player leaves a room
 	 */
 	socket.on('leaveRoom', function() {
+		// console.log(typeof players[socket.id] !== 'undefined');
+		// console.log(players[socket.id].room !== null);
+		// console.log(players[socket.id].sittingOnTable === false);
 		if( typeof players[socket.id] !== 'undefined' && players[socket.id].room !== null && players[socket.id].sittingOnTable === false ) {
 			// Remove the player from the socket room
 			socket.leave( 'table-' + players[socket.id].room );
@@ -145,7 +150,9 @@ io.sockets.on('connection', function( socket ) {
 	 * @param function callback
 	 */
 	socket.on('register', function( newScreenName, callback ) {
-		// If a new screen name is posted
+		// // If a new screen name is posted
+		// console.log(socket.id)
+		// console.log(players[socket.id])
 		if( typeof newScreenName !== 'undefined' ) {
 			var newScreenName = newScreenName.trim();
 			// If the new screen name is not an empty string
@@ -178,6 +185,8 @@ io.sockets.on('connection', function( socket ) {
 	 * @param function callback
 	 */
 	socket.on('sitOnTheTable', function( data, callback ) {
+		console.log(players[socket.id].room);
+
 		if( 
 			// A seat has been specified
 			typeof data.seat !== 'undefined'
@@ -272,18 +281,23 @@ io.sockets.on('connection', function( socket ) {
 	socket.on('check', function( callback ){
 		var tableId = players[0].sittingOnTable;
 		var activeSeat = tables[tableId].public.activeSeat;
-		console.log(players.length + ' / ' + socket.id)
-		console.log(players[0].sittingOnTable);
-		console.log('Table id:' + tableId);
-		console.log(tables[0].seats[activeSeat] +  ' / ' + socket.id);
-		console.log('Biggest bet:' + tables[0].public.biggestBet);
-		console.log('Phase:' + tables[0].public.phase);
-		console.log('Player bet:' + players[0].public.bet);
+		// console.log(players.length + ' / ' + socket.id)
+		console.log("tableId: " + players[0].sittingOnTable);
+		console.log(tables[tableId].public.activeSeat);
+		// console.log('Table id:' + tableId);
+		// console.log(tables[0].seats[activeSeat] +  ' / ' + socket.id);
+		// console.log('Biggest bet:' + tables[0].public.biggestBet);
+		// console.log('Phase:' + tables[0].public.phase);
+		// console.log('Player bet:' + players[0].public.bet);
 		if( players[socket.id].sittingOnTable !== 'undefined' ) {
 			var tableId = players[socket.id].sittingOnTable;
 			var activeSeat = tables[tableId].public.activeSeat;
 
-			
+			console.log(tables[tableId].seats[activeSeat].socket.id + ", " + socket.id );
+			console.log(!tables[tableId].public.biggestBet);
+			console.log(tables[tableId].public.phase === 'preflop');
+			console.log(tables[tableId].public.biggestBet === players[socket.id].public.bet);
+			console.log(['preflop','flop','turn','river'].indexOf(tables[tableId].public.phase) > -1);
 
 
 			if( tables[tableId] 
@@ -426,4 +440,4 @@ tables[1] = new Table( 1, 'Sample 6-handed Table', eventEmitter(1), 6, 4, 2, 400
 tables[2] = new Table( 2, 'Sample 2-handed Table', eventEmitter(2), 2, 8, 4, 800, 160, false );
 tables[3] = new Table( 3, 'Sample 6-handed Private Table', eventEmitter(3), 6, 20, 10, 2000, 400, true );
 
-module.exports = { app, server, io, players, tables };
+module.exports = { app, server, io, players, tables, eventEmitter, htmlEntities };
