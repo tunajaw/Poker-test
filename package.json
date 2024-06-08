@@ -17,7 +17,7 @@
     "less": "~2.0.0",
     "less-middleware": "~1.0.4",
     "socket.io": "~1.2.0",
-    "supertest": "^7.0.0"
+    "supertest": "^3.1.0"
   },
   "devDependencies": {
     "jest": "^24.9.0"

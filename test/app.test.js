@@ -1,7 +1,7 @@
 // app.test.js
 let { io, tables, players, server, eventEmitter, htmlEntities, app} = require('../app');
 const socketClient = require('socket.io-client');
-// const request = require('supertest');
+const request = require('supertest');
 const Table = require('../poker_modules/table');
 const Player = require('../poker_modules/player');
 
@@ -190,13 +190,33 @@ afterEach((done) => {
       // console.log("socket disconnected");
     }
     done();
-  });
+});
 
 describe('htmlEntities', () => {
   it('Nothing to convert', () => {
     str = 'Hello world';
     expect(htmlEntities(str)).toEqual(str);
   })
+});
+
+describe('enterRoom', () => {
+  it('Cannot enter room twice', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    const EnterRoomPromise = new Promise((resolve, reject) => {
+
+      socket.emit('enterRoom', tableId);
+
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+    });
+
+    await EnterRoomPromise;
+  
+  });
 });
 
 describe('Register function', () =>{
@@ -293,7 +313,6 @@ describe('SitOnTable function', () => {
 
     await sitOnTablePromise;
     
-    // 确保在测试逻辑内断言
     expect(sitOnTablePromise).resolves.toEqual({ success: false, 'error': 'The amount of chips should be between the maximum and the minimum amount of allowed buy in'});
   });
 
@@ -316,7 +335,6 @@ describe('SitOnTable function', () => {
 
     await sitOnTablePromise;
     
-    // 确保在测试逻辑内断言
     expect(sitOnTablePromise).resolves.toEqual({ success: false, 'error': 'The amount of chips should be between the maximum and the minimum amount of allowed buy in'});
   });
 
@@ -338,7 +356,6 @@ describe('SitOnTable function', () => {
 
     await sitOnTablePromise;
     
-    // 确保在测试逻辑内断言
     expect(sitOnTablePromise).resolves.toEqual({ success: false, 'error': 'You don\'t have that many chips'});
   });
 
@@ -360,7 +377,6 @@ describe('SitOnTable function', () => {
 
     await sitOnTablePromise;
     
-    // 确保在测试逻辑内断言
     expect(sitOnTablePromise).resolves.toEqual({ success: false});
   });
 
@@ -384,8 +400,30 @@ describe('leaveTable function', () => {
 
     await LeaveTablePromise;
     
-    // 确保在测试逻辑内断言
     expect(LeaveTablePromise).resolves.toEqual({ success: true, totalChips: 1000 });
+  });
+
+  it('leave table unsuccessfully', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    // await Promises.SitOnTheTable(socket); 
+
+    const callback = jest.fn();
+
+    const LeaveTablePromise = new Promise((resolve, reject) => {
+
+      socket.emit('leaveTable', callback);
+
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+    });
+
+    await LeaveTablePromise;
+    
+    expect(callback).toHaveBeenCalledTimes(0);
   });
 });
 
@@ -409,6 +447,32 @@ describe('leaveRoom function', () => {
     });
 
     await LeaveRoomPromise;
+  });
+
+  it('Player cannot leave room if sitting in the table', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket); 
+
+    const callback = jest.fn();
+
+    const LeaveRoomPromise = new Promise((resolve, reject) => {
+
+      socket.emit('leaveRoom', callback);
+
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+
+    });
+
+    await LeaveRoomPromise;
+
+    expect(callback).toHaveBeenCalledTimes(0);
+
+
   });
 });
 
@@ -513,9 +577,9 @@ describe('Post Blind function', () => {
     await Promises.ReallocateSocket();
 
     const PostBlindPromise = new Promise((resolve, reject) => {
-      const callback = (res) => {
+      const callback = jest.fn((res) => {
         resolve(res);
-      };
+      })
 
       socket.emit('postBlind', true, callback);
     });
@@ -607,10 +671,12 @@ describe('Post Blind function', () => {
 
     await Promises.InitialRound(tables[tableId]);
 
+    await Promises.PostBlinds();
+
+    const callback = jest.fn();
+
     const PostBlindPromise = new Promise((resolve, reject) => {
-
-      const callback = () => {};
-
+      
       socket.emit('postBlind', true, callback);
       setTimeout(()=>{
         resolve();
@@ -619,6 +685,8 @@ describe('Post Blind function', () => {
     });
 
     await PostBlindPromise;
+
+    expect(callback).toHaveBeenCalledTimes(0);    
   });
 
 
@@ -648,7 +716,33 @@ describe('Check function', () => {
     await CheckPromise;
 
     expect(CheckPromise).resolves.toEqual({success: true});
-  })
+  });
+
+  it('Player cannot check if not sitting on table', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    const callback = jest.fn();
+
+    const CheckPromise = new Promise((resolve, reject) => {
+
+      getNthPlayer(3).sittingOnTable = 'undefined';
+      socket.emit('check', callback);
+
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+    });
+
+    await CheckPromise;
+    
+    expect(callback).toHaveBeenCalledTimes(0);
+  });
 });
 
 describe('Fold function', () => {
@@ -658,6 +752,8 @@ describe('Fold function', () => {
     await Promises.EnterRoom(socket);
 
     await Promises.SitOnTheTable(socket);
+
+    await Promises.ReallocateSocket();
 
     await Promises.InitialRound(tables[tableId]);
 
@@ -675,6 +771,58 @@ describe('Fold function', () => {
 
     expect(FoldPromise).resolves.toEqual({success: true});
   });
+
+  it('Player cannot fold if not sitting on table', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.ReallocateSocket();
+
+    const callback = jest.fn();
+
+    const FoldPromise = new Promise((resolve, reject) => {
+
+      socket.emit('fold', callback);
+
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+    });
+
+    await FoldPromise;
+    
+    expect(callback).toHaveBeenCalledTimes(0);
+  });
+
+  it('Player cannot fold in posting blind phase', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.ReallocateSocket();
+
+    await Promises.InitialRound(tables[tableId]);
+
+    const callback = jest.fn();
+
+    const FoldPromise = new Promise((resolve, reject) => {
+
+      socket.emit('fold', callback);
+
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+    });
+
+    await FoldPromise;
+    
+    expect(callback).toHaveBeenCalledTimes(0);
+  });
+
+
 });
 
 describe('Raise function', () => {
@@ -706,6 +854,124 @@ describe('Raise function', () => {
 
     expect(RaisePromise).resolves.toEqual({success: true});
   });
+
+  it('Player cannot raise if not sitting on table', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    const callback = jest.fn();
+
+    const RaisePromise = new Promise((resolve, reject) => {
+
+      getNthPlayer(3).sittingOnTable = 'undefined';
+      socket.emit('raise', 10, callback);
+
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+    });
+
+    await RaisePromise;
+    
+    expect(callback).toHaveBeenCalledTimes(0);
+  });
+
+  it('Player cannot raise in posting blind phase', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.ReallocateSocket();
+
+    await Promises.InitialRound(tables[tableId]);
+
+    const callback = jest.fn();
+
+    const RaisePromise = new Promise((resolve, reject) => {
+
+      socket.emit('raise', 10, callback);
+
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+    });
+
+    await RaisePromise;
+    
+    expect(callback).toHaveBeenCalledTimes(0);
+  });
+
+  it('Player cannot raise 0 dollar', async () => {
+    var bet = 0;
+
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    await Promises.ReallocateSocket(); 
+
+    await Promises.PostBlinds();
+
+    const callback = jest.fn();
+
+    const RaisePromise = new Promise((resolve, reject) => {
+
+      tables[tableId].public.biggestBet = 10;
+      socket.emit('raise', bet, callback);
+
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+    });
+
+    await RaisePromise;
+    
+    expect(callback).toHaveBeenCalledTimes(0);
+  });
+
+  it('Player cannot raise more than chips he/she have', async () => {
+    var bet = 10000;
+
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    await Promises.ReallocateSocket(); 
+
+    await Promises.PostBlinds();
+
+    const callback = jest.fn();
+
+    const RaisePromise = new Promise((resolve, reject) => {
+
+      tables[tableId].public.biggestBet = 10;
+      socket.emit('raise', bet, callback);
+
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+    });
+
+    await RaisePromise;
+    
+    expect(callback).toHaveBeenCalledTimes(0);
+  });
+
 });
 
 describe('Bet function', () => {
@@ -736,6 +1002,91 @@ describe('Bet function', () => {
 
     expect(BetPromise).resolves.toEqual({success: true});
   });
+
+  it('Player cannot bet 0 dollar', async () => {
+    var bet = 0;
+
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    await Promises.ReallocateSocket(); 
+
+    await Promises.PostBlinds();
+
+    const callback = jest.fn();
+
+    const BetPromise = new Promise((resolve, reject) => {
+
+      socket.emit('bet', bet, callback);
+
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+    });
+
+    await BetPromise;
+    
+    expect(callback).toHaveBeenCalledTimes(0);
+  });
+
+  it('Player cannot bet if not sitting on table', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    const callback = jest.fn();
+
+    const BetPromise = new Promise((resolve, reject) => {
+
+      getNthPlayer(3).sittingOnTable = 'undefined';
+      socket.emit('bet', 10, callback);
+
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+    });
+
+    await BetPromise;
+    
+    expect(callback).toHaveBeenCalledTimes(0);
+  });
+
+  it('Player cannot bet in posting blind phase', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.ReallocateSocket();
+
+    await Promises.InitialRound(tables[tableId]);
+
+    const callback = jest.fn();
+
+    const BetPromise = new Promise((resolve, reject) => {
+
+      socket.emit('bet', 10, callback);
+
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+    });
+
+    await BetPromise;
+    
+    expect(callback).toHaveBeenCalledTimes(0);
+  });
+
 });
 
 describe('Call function', () => {
@@ -764,27 +1115,115 @@ describe('Call function', () => {
 
     expect(CallPromise).resolves.toEqual({success: true});
   });
+
+  it('Player cannot call if not sitting on table', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    const callback = jest.fn();
+
+    const CallPromise = new Promise((resolve, reject) => {
+
+      getNthPlayer(3).sittingOnTable = 'undefined';
+      socket.emit('call', callback);
+
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+    });
+
+    await CallPromise;
+    
+    expect(callback).toHaveBeenCalledTimes(0);
+  });
+
+  it('Player cannot call in posting blind phase', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.ReallocateSocket();
+
+    await Promises.InitialRound(tables[tableId]);
+
+    const callback = jest.fn();
+
+    const CallPromise = new Promise((resolve, reject) => {
+
+      socket.emit('call', callback);
+
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+    });
+
+    await CallPromise;
+    
+    expect(callback).toHaveBeenCalledTimes(0);
+  });
+
 });
 
-// describe('Express Routes', () => {
-//   it('should get the lobby data', async () => {
-//     const response = await request(app).get('/lobby-data');
-//     expect(response.status).toBe(200);
-//     expect(response.body).toBeInstanceOf(Array);
-//   });
+describe('Express Routes', () => {
+  it('should get the lobby', async () => {
+    const response = await request(app).get('/');
+    expect(response.status).toBe(200);
+  });
 
-//   it('should redirect to lobby for /table-10/:tableId', async () => {
-//     const response = await request(app).get('/table-10/1');
-//     expect(response.status).toBe(302);
-//     expect(response.header.location).toBe('/');
-//   });
+  it('should get the lobby data', async () => {
+    const response = await request(app).get('/lobby-data');
+    expect(response.status).toBe(200);
+    expect(response.body).toBeInstanceOf(Array);
+  });
 
-//   it('should get the table data', async () => {
-//     const response = await request(app).get('/table-data/table1');
-//     expect(response.status).toBe(200);
-//     expect(response.body).toHaveProperty('table');
-//   });
-// });
+  it('should redirect to lobby for /table-10/:tableId', async () => {
+    const response = await request(app).get('/table-10/1');
+    expect(response.status).toBe(302);
+    expect(response.header.location).toBe('/');
+  });
+
+  it('should redirect to lobby for /table-6/:tableId', async () => {
+    const response = await request(app).get('/table-6/1');
+    expect(response.status).toBe(302);
+    expect(response.header.location).toBe('/');
+  });
+
+  it('should redirect to lobby for /table-2/:tableId', async () => {
+    const response = await request(app).get('/table-2/1');
+    expect(response.status).toBe(302);
+    expect(response.header.location).toBe('/');
+  });
+
+  it('should get the table data', async () => {
+    const response = await request(app).get('/table-data/0');
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('table');
+  });
+
+  it('should get the table data', async () => {
+    const response = await request(app).get('/table-data/0');
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('table');
+  });
+
+  it('should use error handler middleware in development mode', async () => {
+    app.get('/error', (req, res) => {
+      throw new Error('Test error');
+    });
+
+    const response = await request(app).get('/error');
+    expect(response.status).toBe(500); // 检查是否返回 500 状态码
+    expect(response.text).toContain('Error: Test error'); // 检查响应中是否包含错误信息
+  });
+
+});
 
 
 // describe('Check function', () => {
