@@ -295,7 +295,7 @@ io.sockets.on('connection', function( socket ) {
 
 			console.log(tables[tableId].seats[activeSeat].socket.id + ", " + socket.id );
 			console.log(!tables[tableId].public.biggestBet);
-			console.log(tables[tableId].public.phase === 'preflop');
+			console.log(tables[tableId].public.phase );
 			console.log(tables[tableId].public.biggestBet === players[socket.id].public.bet);
 			console.log(['preflop','flop','turn','river'].indexOf(tables[tableId].public.phase) > -1);
 
@@ -337,6 +337,9 @@ io.sockets.on('connection', function( socket ) {
 		if( players[socket.id].sittingOnTable !== 'undefined' ) {
 			var tableId = players[socket.id].sittingOnTable;
 			var activeSeat = tables[tableId].public.activeSeat;
+
+			console.log(activeSeat);
+			console.log(tables[tableId].seats[activeSeat].socket.id);
 
 			if( tables[tableId] && tables[tableId].seats[activeSeat].socket.id === socket.id && tables[tableId].public.biggestBet && ['preflop','flop','turn','river'].indexOf(tables[tableId].public.phase) > -1 ) {
 				// Sending the callback first, because the next functions may need to send data to the same player, that shouldn't be overwritten
@@ -409,6 +412,8 @@ io.sockets.on('connection', function( socket ) {
 	 */
 	socket.on('sendMessage', function( message ) {
 		message = message.trim();
+		console.log(message);
+		console.log(players[socket.id].room);
 		if( message && players[socket.id].room ) {
 			socket.broadcast.to( 'table-' + players[socket.id].room ).emit( 'receiveMessage', { 'message': htmlEntities( message ), 'sender': players[socket.id].public.name } );
 		}

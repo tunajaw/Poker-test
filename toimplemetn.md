@@ -10,11 +10,11 @@
 
 [x] sitOnTable
 
-[] sitIn
+[x] sitIn
 
-[] postBlind
+[x] postBlind
 
-[] check
+[-] check
 
 [] fold
 
@@ -24,4 +24,4 @@
 
 [] raise
 
-[] sendMessage
+[x] sendMessage

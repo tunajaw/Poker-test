@@ -1,10 +1,11 @@
 // app.test.js
-let { io, tables, players, server, eventEmitter, htmlEntities} = require('../app');
+let { io, tables, players, server, eventEmitter, htmlEntities, app} = require('../app');
 const socketClient = require('socket.io-client');
+// const request = require('supertest');
 const Table = require('../poker_modules/table');
 const Player = require('../poker_modules/player');
 
-var tableId = 0;
+var tableId = '0';
 
 // Table.prototype.playerSatOnTheTable(players[0], 2, 1000)
 // process.on('unhandledRejection', (reason) => {});
@@ -69,6 +70,51 @@ const Promises = {
         resolve();
       });
     })
+  },
+
+  ReallocateSocket: () => {
+    return new Promise((resolve) => {
+      socketId = getNthPlayer(3).socket.id;
+      for(let i=1; i<=2; i++){
+        getNthPlayer(i).socket.id = socketId;
+      }
+      resolve();
+    })
+  },
+
+  PostSmallBlind: () => {
+    return new Promise((resolve) => {
+      const callback = (res) => {
+        try {
+          expect(res.success).toBe(true);
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      };
+      socket.emit('postBlind', true, callback);
+    });
+  },
+
+  PostBlinds: () => {
+    return new Promise((resolve) => {
+      try {
+        tables[tableId].initializeSmallBlind();
+        tables[tableId].initializeBigBlind();
+        tables[tableId].initializePreflop();
+        resolve();
+      } catch (error) {
+        throw new Error(error);
+      }
+    });
+  },
+
+  TurnPhase: () => {
+    return new Promise((resolve) => {
+      if(tables[tableId].public.phase == '')
+      tables[tableId].initialePreflop();
+      resolve();
+    })
   }
 
 };
@@ -82,12 +128,14 @@ function initializeTestTable(socket) {
     if(!sameName){
       for( var i=0 ; i<2 ; i++ ) {
         players[i] = new Player( socket, 'Player_'+i, 1000 );
+        players[i].room = tableId;
         players[i].socket = socket;
       }
     }
     else{
       for( var i=0 ; i<2 ; i++ ) {
         players[i] = new Player( socket, 'NewPlayer', 1000 );
+        players[i].room = tableId;
         players[i].socket = socket;
       }
     }
@@ -362,7 +410,382 @@ describe('leaveRoom function', () => {
 
     await LeaveRoomPromise;
   });
-})
+});
+
+describe('SitIn function', () => {
+  it('Sit in table succesfully', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket); 
+
+    // await Promises.LeaveTable();
+
+    const SitInPromise = new Promise((resolve, reject) => {
+      const callback = (res) => {
+        resolve(res);
+      };
+      // modify the status of the player's sittingOnTable
+      getNthPlayer(3).public.sittingIn = false;
+      socket.emit('sitIn', callback);
+    });
+
+    await SitInPromise;
+    
+    // 确保在测试逻辑内断言
+    expect(SitInPromise).resolves.toEqual({success: true});
+  });
+
+  it('Already sat in the table', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket); 
+
+    // await Promises.LeaveTable();
+
+    const SitInPromise = new Promise((resolve, reject) => {
+      socket.emit('sitIn', ()=>{});
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+    });
+
+    await SitInPromise;
+  });
+});
+
+// Need to be further track the messages
+describe('Send Meassage function', ()=> {
+  it('The message can be sent', async () => {
+    var msg = 'Hello world';
+
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket); 
+
+    const SendMsgPromise = new Promise((resolve, reject) => {
+      socket.emit('sendMessage', msg);
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+      
+    });
+
+    await SendMsgPromise;
+  });
+
+  it('Empty message', async () => {
+    var msg = '';
+
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket); 
+
+    const SendMsgPromise = new Promise((resolve, reject) => {
+      socket.emit('sendMessage', msg);
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+      
+    });
+
+    await SendMsgPromise;
+  });
+});
+
+describe('Post Blind function', () => {
+  it('The small blind can be posted', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    await Promises.ReallocateSocket();
+
+    const PostBlindPromise = new Promise((resolve, reject) => {
+      const callback = (res) => {
+        resolve(res);
+      };
+
+      socket.emit('postBlind', true, callback);
+    });
+
+    await PostBlindPromise;
+
+    expect(PostBlindPromise).resolves.toEqual({success: true});
+  });
+
+  it('The big blind can be posted', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    await Promises.ReallocateSocket();
+
+    await Promises.PostSmallBlind();
+
+    const PostBlindPromise = new Promise((resolve, reject) => {
+      const callback = (res) => {
+        resolve(res);
+      };
+
+      socket.emit('postBlind', true, callback);
+    });
+
+    await PostBlindPromise;
+
+    expect(PostBlindPromise).resolves.toEqual({success: true});
+  });
+
+  it('Set blind to false', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    await Promises.ReallocateSocket();
+
+    await Promises.PostSmallBlind();
+
+    const PostBlindPromise = new Promise((resolve, reject) => {
+      const callback = (res) => {
+        resolve(res);
+      };
+
+      socket.emit('postBlind', false, callback);
+    });
+
+    await PostBlindPromise;
+
+    expect(PostBlindPromise).resolves.toEqual({success: true});
+  });
+
+  it('Player is not sitting at the table', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    const PostBlindPromise = new Promise((resolve, reject) => {
+
+      const callback = () => {};
+
+      socket.emit('postBlind', true, callback);
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+      
+    });
+
+    await PostBlindPromise;
+  });
+
+  it('Invalid post blind', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    const PostBlindPromise = new Promise((resolve, reject) => {
+
+      const callback = () => {};
+
+      socket.emit('postBlind', true, callback);
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+      
+    });
+
+    await PostBlindPromise;
+  });
+
+
+});
+
+// Need to be do CACC tests
+describe('Check function', () => {
+  it('Player can check', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    await Promises.PostBlinds();
+
+    const CheckPromise = new Promise((resolve, reject) => {
+      const callback = (res) => {
+        resolve(res);
+      };
+
+      socket.emit('check', callback);
+    });
+
+    await CheckPromise;
+
+    expect(CheckPromise).resolves.toEqual({success: true});
+  })
+});
+
+describe('Fold function', () => {
+  it('Player can fold', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    await Promises.PostBlinds();
+
+    const FoldPromise = new Promise((resolve, reject) => {
+      const callback = (res) => {
+        resolve(res);
+      };
+
+      socket.emit('fold', callback);
+    });
+
+    await FoldPromise;
+
+    expect(FoldPromise).resolves.toEqual({success: true});
+  });
+});
+
+describe('Raise function', () => {
+  it('Player can raise', async () => {
+    var bet = 10;
+
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    await Promises.ReallocateSocket(); 
+
+    await Promises.PostBlinds();
+
+    const RaisePromise = new Promise((resolve, reject) => {
+      const callback = (res) => {
+        resolve(res);
+      };
+
+      tables[tableId].public.biggestBet = 10;
+      socket.emit('raise', bet, callback);
+    });
+
+    await RaisePromise;
+
+    expect(RaisePromise).resolves.toEqual({success: true});
+  });
+});
+
+describe('Bet function', () => {
+  it('Player can bet', async () => {
+    var bet = 10;
+
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    await Promises.ReallocateSocket(); 
+
+    await Promises.PostBlinds();
+
+    const BetPromise = new Promise((resolve, reject) => {
+      const callback = (res) => {
+        resolve(res);
+      };
+
+      socket.emit('bet', bet, callback);
+    });
+
+    await BetPromise;
+
+    expect(BetPromise).resolves.toEqual({success: true});
+  });
+});
+
+describe('Call function', () => {
+  it('Player can call', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    await Promises.ReallocateSocket(); 
+
+    await Promises.PostBlinds();
+
+    const CallPromise = new Promise((resolve, reject) => {
+      const callback = (res) => {
+        resolve(res);
+      };
+      tables[tableId].public.biggestBet = 10;
+      socket.emit('call', callback);
+    });
+
+    await CallPromise;
+
+    expect(CallPromise).resolves.toEqual({success: true});
+  });
+});
+
+// describe('Express Routes', () => {
+//   it('should get the lobby data', async () => {
+//     const response = await request(app).get('/lobby-data');
+//     expect(response.status).toBe(200);
+//     expect(response.body).toBeInstanceOf(Array);
+//   });
+
+//   it('should redirect to lobby for /table-10/:tableId', async () => {
+//     const response = await request(app).get('/table-10/1');
+//     expect(response.status).toBe(302);
+//     expect(response.header.location).toBe('/');
+//   });
+
+//   it('should get the table data', async () => {
+//     const response = await request(app).get('/table-data/table1');
+//     expect(response.status).toBe(200);
+//     expect(response.body).toHaveProperty('table');
+//   });
+// });
+
 
 // describe('Check function', () => {
 //   it('Normal check', async (done) => {
