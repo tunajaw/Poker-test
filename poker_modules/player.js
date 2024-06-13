@@ -147,13 +147,13 @@ Player.prototype.evaluateHand = function( board ) {
     }
 
     // Swaps the position of the cards of the first one is smaller than the second one
-    var swap = function( index1, index2 ) {
-        if ( cardNamess.indexOf( cards[index1][0] ) < cardNamess.indexOf( cards[index2][0] )){
-            var tmp = cards[index1];
-            cards[index1] = cards[index2];
-            cards[index2] = tmp;
-        }
-    };
+    // var swap = function( index1, index2 ) {
+    //     if ( cardNamess.indexOf( cards[index1][0] ) < cardNamess.indexOf( cards[index2][0] )){
+    //         var tmp = cards[index1];
+    //         cards[index1] = cards[index2];
+    //         cards[index2] = tmp;
+    //     }
+    // };
 	
 	var rateHand = function( hand ) {
 		return cardNamess.indexOf( hand[0][0] ) * 30941 + cardNamess.indexOf( hand[1][0] ) * 2380 + cardNamess.indexOf( hand[2][0] ) * 183 + cardNamess.indexOf( hand[3][0] ) * 14 + cardNamess.indexOf( hand[4][0] );
@@ -242,6 +242,9 @@ Player.prototype.evaluateHand = function( board ) {
 					else if( currentCardValue != previousCardValue && straightFlush.length < 5 ) {
 						straightFlush = [flushes[i][j]];
 					}
+                    else {
+                        throw new Error("Flush but have same card continuously!");
+                    }
 					j++;
 				}
 				if( straightFlush.length == 4 && straightFlush[3][0] == '2' && cards.indexOf('A'+i) >= 0 ) {
@@ -312,6 +315,9 @@ Player.prototype.evaluateHand = function( board ) {
                         i++;
                     }
                 }
+                else {
+                    throw new Error("Five same value card should never happened!");
+                }
             }
             // If there are two pairs
             else if( numberOfPairs == 2 ) {
@@ -372,34 +378,16 @@ Player.prototype.evaluateHand = function( board ) {
 				// Else, there are three pairs of two cards, so find the biggest one
 				if( !evaluatedHand.cards.length ) {
 					evaluatedHand.rank = 'two pair';
-					if( cardNamess.indexOf( pairKeys[0] ) > cardNamess.indexOf( pairKeys[1] ) ) {
-						if( cardNamess.indexOf( pairKeys[0] ) > cardNamess.indexOf( pairKeys[2] ) ) {
-							evaluatedHand.cards = pairs[ pairKeys[0] ];
-							delete pairs[ pairKeys[0] ];
-						} else {
-							evaluatedHand.cards = pairs[ pairKeys[2] ];
-							delete pairs[ pairKeys[2] ];
-						}
-					} else {
-						if( cardNamess.indexOf( pairKeys[1] ) > cardNamess.indexOf( pairKeys[2] ) ) {
-							evaluatedHand.cards = pairs[ pairKeys[1] ];
-							delete pairs[ pairKeys[1] ];
-						} else {
-							evaluatedHand.cards = pairs[ pairKeys[2] ];
-							delete pairs[ pairKeys[2] ];
-						}
-					}
+                    evaluatedHand.cards = pairs[ pairKeys[2] ];
+                    delete pairs[ pairKeys[2] ];
+						
 				}
 				// Adding the second biggest pair in the hand
-                if( cardNamess.indexOf( Object.keys(pairs)[0] ) > cardNamess.indexOf( Object.keys(pairs)[1] ) ) {
-                    for( var j=0 ; j<2 ; j++ ) {
-						evaluatedHand.cards.push( pairs[Object.keys(pairs)[0]][j] );
-                    }
-                } else {
-                    for( var j=0 ; j<2 ; j++ ) {
-						evaluatedHand.cards.push( pairs[Object.keys(pairs)[1]][j] );
-                    }
+                
+                for( var j=0 ; j<2 ; j++ ) {
+                    evaluatedHand.cards.push( pairs[Object.keys(pairs)[1]][j] );
                 }
+
                 
 				// If the biggest pair has two cards, add one kicker
 				if( evaluatedHand.rank == 'two pair' ) {

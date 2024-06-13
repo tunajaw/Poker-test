@@ -104,7 +104,7 @@ Pot.prototype.addPlayersBets = function( player ) {
   this.pots[currentPot].amount += player.public.bet;
   player.public.bet = 0;
   // If the player is not in the list of contributors, add them
-  if( !this.pots[currentPot].contributors.indexOf( player.seat ) ) {
+  if( this.pots[currentPot].contributors.indexOf( player.seat ) === -1) {
     this.pots[currentPot].contributors.push( player.seat );
   }
 }

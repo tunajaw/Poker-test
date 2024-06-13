@@ -70,13 +70,14 @@ app.get('/table-2/:tableId', function( req, res ) {
 
 // The table data
 app.get('/table-data/:tableId', function( req, res ) {
-	if( typeof req.params.tableId !== 'undefined' && typeof tables[req.params.tableId] !== 'undefined' ) {
-		res.send( { 'table': tables[req.params.tableId].public } );
-	}
+	if (typeof req.params.tableId !== 'undefined' && typeof tables[req.params.tableId] !== 'undefined') {
+        res.send({ 'table': tables[req.params.tableId].public });
+    } else {
+        res.status(404).send({ error: 'Table not found' }); // 返回 404 错误
+    }
 });
 
 io.sockets.on('connection', function( socket ) {
-
 	/**
 	 * When a player enters a room
 	 * @param object table-data
@@ -154,7 +155,7 @@ io.sockets.on('connection', function( socket ) {
 		// // If a new screen name is posted
 		// console.log(socket.id)
 		// console.log(players[socket.id])
-		if( typeof newScreenName !== 'undefined' ) {
+		if( newScreenName !== null ) {
 			var newScreenName = newScreenName.trim();
 			// If the new screen name is not an empty string
 			if( newScreenName && typeof players[socket.id] === 'undefined' ) {
@@ -283,30 +284,18 @@ io.sockets.on('connection', function( socket ) {
 		var tableId = players[0].sittingOnTable;
 		var activeSeat = tables[tableId].public.activeSeat;
 		// console.log(players.length + ' / ' + socket.id)
-		console.log("tableId: " + players[0].sittingOnTable);
-		console.log(tables[tableId].public.activeSeat);
-		// console.log('Table id:' + tableId);
-		// console.log(tables[0].seats[activeSeat] +  ' / ' + socket.id);
-		// console.log('Biggest bet:' + tables[0].public.biggestBet);
-		// console.log('Phase:' + tables[0].public.phase);
-		// console.log('Player bet:' + players[0].public.bet);
 		if( players[socket.id].sittingOnTable !== 'undefined' ) {
 			var tableId = players[socket.id].sittingOnTable;
 			var activeSeat = tables[tableId].public.activeSeat;
 
-			console.log(tables[tableId].seats[activeSeat].socket.id + ", " + socket.id );
-			console.log(!tables[tableId].public.biggestBet);
-			console.log(tables[tableId].public.phase );
-			console.log(tables[tableId].public.biggestBet === players[socket.id].public.bet);
-			console.log(['preflop','flop','turn','river'].indexOf(tables[tableId].public.phase) > -1);
-
-
 			if( tables[tableId] 
 				&& tables[tableId].seats[activeSeat].socket.id === socket.id 
-				&& !tables[tableId].public.biggestBet || ( tables[tableId].public.phase === 'preflop' && tables[tableId].public.biggestBet === players[socket.id].public.bet )
+				&& !tables[tableId].public.biggestBet || ( tables[tableId].public.phase === 'preflop' 
+					&& tables[tableId].public.biggestBet === players[socket.id].public.bet )
 				&& ['preflop','flop','turn','river'].indexOf(tables[tableId].public.phase) > -1 
 			) {
-				// Sending the callback first, because the next functions may need to send data to the same player, that shouldn't be overwritten
+
+				// Sending the callback
 				callback( { 'success': true } );
 				tables[tableId].playerChecked();
 			}

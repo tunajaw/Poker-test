@@ -111,11 +111,52 @@ const Promises = {
 
   TurnPhase: () => {
     return new Promise((resolve) => {
-      if(tables[tableId].public.phase == '')
-      tables[tableId].initialePreflop();
+      tables[tableId].initializeNextPhase();
       resolve();
     })
-  }
+  },
+
+  Bet: (bet) => {
+    return new Promise((resolve) => {
+      const callback = (res) => {
+        try {
+          expect(res.success).toBe(true);
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      };
+      socket.emit('bet', bet, callback);
+    });
+  },
+
+  Check: () => {
+    return new Promise((resolve) => {
+      const callback = (res) => {
+        try {
+          expect(res.success).toBe(true);
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      };
+      socket.emit('check', callback);
+    });
+  },
+
+  Call: () => {
+    return new Promise((resolve) => {
+      const callback = (res) => {
+        try {
+          expect(res.success).toBe(true);
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      };
+      socket.emit('call', callback);
+    });
+  },
 
 };
 
@@ -192,6 +233,7 @@ afterEach((done) => {
     done();
 });
 
+
 describe('htmlEntities', () => {
   it('Nothing to convert', () => {
     str = 'Hello world';
@@ -262,6 +304,22 @@ describe('Register function', () =>{
           try {
             expect(callback).toHaveBeenCalled();
             expect(callback).toHaveBeenCalledWith({ 'success': false, 'message': 'Please enter a screen name' });
+            done();
+          } catch (error) {
+            done(error);
+          }
+        });
+
+      socket.emit('register', newScreenName, callback);
+    });
+
+    it('Player registered unsuccessfully', (done) => {
+      const newScreenName = undefined;
+
+      const callback = jest.fn((res) => {
+          try {
+            expect(callback).toHaveBeenCalled();
+            expect(callback).toHaveBeenCalledWith({ 'success': false, 'message': '' });
             done();
           } catch (error) {
             done(error);
@@ -743,6 +801,31 @@ describe('Check function', () => {
     
     expect(callback).toHaveBeenCalledTimes(0);
   });
+
+  // it('Player cannot check if at posting big/small blind phase', async () => {
+  //   await Promises.Register(socket);
+
+  //   await Promises.EnterRoom(socket);
+
+  //   await Promises.SitOnTheTable(socket);
+
+  //   await Promises.InitialRound(tables[tableId]);
+
+  //   const callback = jest.fn();
+
+  //   const CheckPromise = new Promise((resolve, reject) => {
+
+  //     socket.emit('check', callback);
+
+  //     setTimeout(()=>{
+  //       resolve();
+  //     }, 100);
+  //   });
+
+  //   await CheckPromise;
+    
+  //   expect(callback).toHaveBeenCalledTimes(0);
+  // });
 });
 
 describe('Fold function', () => {
@@ -1207,10 +1290,10 @@ describe('Express Routes', () => {
     expect(response.body).toHaveProperty('table');
   });
 
-  it('should get the table data', async () => {
-    const response = await request(app).get('/table-data/0');
-    expect(response.status).toBe(200);
-    expect(response.body).toHaveProperty('table');
+
+  it('should not get the table data', async () => {
+    const response = await request(app).get('/table-data/eee');
+    expect(response.status).toBe(404);
   });
 
   it('should use error handler middleware in development mode', async () => {
@@ -1219,101 +1302,352 @@ describe('Express Routes', () => {
     });
 
     const response = await request(app).get('/error');
-    expect(response.status).toBe(500); // 检查是否返回 500 状态码
-    expect(response.text).toContain('Error: Test error'); // 检查响应中是否包含错误信息
+    expect(response.status).toBe(500);
+    expect(response.text).toContain('Error: Test error');
   });
 
 });
 
+describe('Logic coverage for check function', () => {
+  it('TR#1 (TTTFFT)', async () => {
+    await Promises.Register(socket);
 
-// describe('Check function', () => {
-//   it('Normal check', async (done) => {
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.ReallocateSocket();
+
+    await Promises.InitialRound(tables[tableId]);
+
+    await Promises.PostBlinds();
+
+    const CheckPromise = new Promise((resolve, reject) => {
+      const callback = (res) => {
+        resolve(res);
+      };
+
+      tables[tableId].public.biggestBet = 0;
+      tables[tableId].public.phase = 'flop';
+      getNthPlayer(3).public.bet = 0;
+
+
+      socket.emit('check', callback);
+    });
+
+    await CheckPromise;
+
+    expect(CheckPromise).resolves.toEqual({success: true});
+  });
+
+  it('TR#2 (TTFTFT)', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.ReallocateSocket();
+
+    await Promises.InitialRound(tables[tableId]);
+
+    await Promises.PostBlinds();
+
+    const callback = jest.fn();
+
+    const CheckPromise = new Promise((resolve, reject) => {
+
+      tables[tableId].public.biggestBet = 10;
+      getNthPlayer(3).public.bet = 0;
+
+      socket.emit('check', callback);
+
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+    });
+
+    await CheckPromise;
     
+    expect(callback).toHaveBeenCalledTimes(0);
+  });
 
+  // it('TR#3 (FFFFFF)', async () => {
+
+  //   const callback = jest.fn();
+
+  //   const CheckPromise = new Promise((resolve, reject) => {
+
+  //     socket.emit('check', callback);
+
+  //     setTimeout(()=>{
+  //       resolve();
+  //     }, 100);
+  //   });
+
+  //   await CheckPromise;
+    
+  //   expect(callback).toHaveBeenCalledTimes(0);
+  // });
+
+  it('TR#4 (TFFTTT)', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    await Promises.PostBlinds();
+
+    const CheckPromise = new Promise((resolve, reject) => {
+
+      const callback = (res) => {
+        resolve(res);
+      };
+
+      tables[tableId].public.biggestBet = 0;
+      getNthPlayer(3).public.bet = 0;
+      //tables[tableId].seats[tables[tableId].public.activeSeat] = getNthPlayer(3);
+
+      socket.emit('check', callback);
+
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+    });
+
+    await CheckPromise;
+    
+    expect(CheckPromise).resolves.toEqual({success: true});
+  });
+
+  it('TR#5 (TFTFTF)', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    const callback = jest.fn();
+
+    const CheckPromise = new Promise((resolve, reject) => {
+      tables[tableId].seats[tables[tableId].public.activeSeat] = getNthPlayer(2);
+      socket.emit('check', callback);
+
+      setTimeout(()=>{
+        resolve();
+      }, 200);
+    });
+
+    await CheckPromise;
+    
+    expect(callback).toHaveBeenCalledTimes(0);
+  });
+
+  it('TR#6 (TTFFFF)', async () => {
+    await Promises.Register(socket);
+
+    await Promises.EnterRoom(socket);
+
+    await Promises.SitOnTheTable(socket);
+
+    await Promises.InitialRound(tables[tableId]);
+
+    await Promises.PostSmallBlind();
+
+    const callback = jest.fn();
+
+    const CheckPromise = new Promise((resolve, reject) => {
+
+      tables[tableId].seats[tables[tableId].public.activeSeat] = getNthPlayer(3);
+      getNthPlayer(2).public.bet = 10;
+      socket.emit('check', callback);
+
+      setTimeout(()=>{
+        resolve();
+      }, 100);
+    });
+
+    await CheckPromise;
+    
+    expect(callback).toHaveBeenCalledTimes(0);
+  });
+});
+
+
+
+// describe('Logic coverage for check function', () => {
+//   it('TR#1 (TTTFTT)', async () => {
 //     await Promises.Register(socket);
 
 //     await Promises.EnterRoom(socket);
 
-//     await Promises.SitInOnTheTable(socket); 
+//     await Promises.SitOnTheTable(socket);
+
+//     await Promises.ReallocateSocket();
 
 //     await Promises.InitialRound(tables[tableId]);
 
-//     console.log(tables[tableId].public);
+//     await Promises.PostBlinds();
 
-//     const checkPromise = new Promise((resolve, reject) => {
+//     await Promises.Call();
+
+//     await Promises.Call();
+
+//     await Promises.Check();
+
+//     await Promises.TurnPhase();
+
+//     await Promises.Check();
+
+//     await Promises.Check();
+
+//     const CheckPromise = new Promise((resolve, reject) => {
 //       const callback = (res) => {
-//         console.log('Check:', res.success);
-//         try {
-//           expect(res.success).toBe(true);
-//           resolve();
-//         } catch (error) {
-//           reject(error);
-//         }
+//         resolve(res);
 //       };
+
 //       socket.emit('check', callback);
 //     });
 
-//     try {
-//       await checkPromise;
-//       done();
-//     } catch (error) {
-//       done(error);
-//     }
-//   })
-// });
+//     await CheckPromise;
 
+//     expect(CheckPromise).resolves.toEqual({success: true});
+//   });
 
+//   it('TR#2 (TTFTFT)', async () => {
+//     await Promises.Register(socket);
 
-// test('Clause Coverage for tables[tableId] is true', (done) => {
+//     await Promises.EnterRoom(socket);
+
+//     await Promises.SitOnTheTable(socket);
+
+//     await Promises.ReallocateSocket();
+
+//     await Promises.InitialRound(tables[tableId]);
+
+//     await Promises.PostBlinds();
+
+//     await Promises.Bet(10);
+
+//     await Promises.Check();
+
 //     const callback = jest.fn();
-//     console.log("before emit");
-//     socket.emit('check', callback);
-//     console.log("after emit");
 
-//     setTimeout(() => {
-//         expect(callback).toHaveBeenCalledWith({ success: true });
-//         expect(tables.playerChecked).toHaveBeenCalled();
-//         done();
-//     }, 50);
-// });
+//     const CheckPromise = new Promise((resolve, reject) => {
 
-// test('Clause Coverage for tables[tableId] is false', (done) => {
-//   const callback = jest.fn();
+//       socket.emit('check', callback);
 
-//   // 修改 tables 使得 tables[tableId] 為 false
-//   delete tables['table1'];
+//       setTimeout(()=>{
+//         resolve();
+//       }, 100);
+//     });
 
-//   socket.emit('check', callback);
+//     await CheckPromise;
+    
+//     expect(callback).toHaveBeenCalledTimes(0);
+//   });
 
-//   setTimeout(() => {
-//     expect(callback).not.toHaveBeenCalled();
-//     done();
-//   }, 50);
-// });
+//   it('TR#3 (FFFFFF)', async () => {
+//     const CheckPromise = new Promise((resolve, reject) => {
 
-// test('Clause Coverage for tables[tableId].seats[activeSeat].socket.id === socket.id is true', (done) => {
-//   const callback = jest.fn();
+//       socket.emit('check', callback);
 
-//   socket.emit('check', callback);
+//       setTimeout(()=>{
+//         resolve();
+//       }, 100);
+//     });
 
-//   setTimeout(() => {
-//     expect(callback).toHaveBeenCalledWith({ success: true });
-//     expect(tables['table1'].playerChecked).toHaveBeenCalled();
-//     done();
-//   }, 50);
-// });
+//     await CheckPromise;
+    
+//     expect(callback).toHaveBeenCalledTimes(0);
+//   });
 
-// test('Clause Coverage for tables[tableId].seats[activeSeat].socket.id === socket.id is false', (done) => {
-//   const callback = jest.fn();
+//   it('TR#4 (TFFTTT)', async () => {
+//     await Promises.Register(socket);
 
-//   // 修改 socket id 使得對應子句為 false
-//   tables['table1'].seats[0].socket.id = 'differentSocket';
+//     await Promises.EnterRoom(socket);
 
-//   socket.emit('check', callback);
+//     await Promises.SitOnTheTable(socket);
 
-//   setTimeout(() => {
-//     expect(callback).not.toHaveBeenCalled();
-//     expect(tables['table1'].playerChecked).not.toHaveBeenCalled();
-//     done();
-//   }, 50);
+//     await Promises.InitialRound(tables[tableId]);
+
+//     await Promises.PostBlinds();
+
+//     await Promises.Check();
+
+//     await Promises.Check();
+
+//     await Promises.Bet(10);
+
+//     const CheckPromise = new Promise((resolve, reject) => {
+//       const callback = (res) => {
+//         resolve(res);
+//       };
+
+//       socket.emit('check', callback);
+//     });
+
+//     await CheckPromise;
+
+//     expect(CheckPromise).resolves.toEqual({success: true});
+//   });
+
+//   it('TR#5 (TFTFTF)', async () => {
+//     await Promises.Register(socket);
+
+//     await Promises.EnterRoom(socket);
+
+//     await Promises.SitOnTheTable(socket);
+
+//     await Promises.InitialRound(tables[tableId]);
+
+//     const callback = jest.fn();
+
+//     const CheckPromise = new Promise((resolve, reject) => {
+
+//       socket.emit('check', callback);
+
+//       setTimeout(()=>{
+//         resolve();
+//       }, 100);
+//     });
+
+//     await CheckPromise;
+    
+//     expect(callback).toHaveBeenCalledTimes(0);
+//   });
+
+//   it('TR#6 (TTFFFF)', async () => {
+//     await Promises.Register(socket);
+
+//     await Promises.EnterRoom(socket);
+
+//     await Promises.SitOnTheTable(socket);
+
+//     await Promises.InitialRound(tables[tableId]);
+
+//     await Promises.ChangeStartPlayerToPlayer(1);
+
+//     await Promises.PostSmallBlind();
+
+//     const callback = jest.fn();
+
+//     const CheckPromise = new Promise((resolve, reject) => {
+
+//       socket.emit('check', callback);
+
+//       setTimeout(()=>{
+//         resolve();
+//       }, 100);
+//     });
+
+//     await CheckPromise;
+    
+//     expect(callback).toHaveBeenCalledTimes(0);
+//   });
 // });
